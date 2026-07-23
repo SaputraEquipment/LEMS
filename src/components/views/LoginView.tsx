@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { FlaskConical, Shield, KeyRound, UserCheck, Eye } from 'lucide-react';
+import { FlaskConical, Shield, KeyRound, UserCheck, Eye, EyeOff, Info } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const { login, loginAsGuest, companyProfile } = useApp();
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('admin123');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showQuickSelect, setShowQuickSelect] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login(username, password);
+  };
+
+  const fillAccount = (user: string, pass: string) => {
+    setUsername(user);
+    setPassword(pass);
   };
 
   return (
@@ -63,13 +70,20 @@ export const LoginView: React.FC = () => {
               <div className="relative">
                 <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Enter password"
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -82,7 +96,58 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
-          <div className="relative my-6">
+          {/* Quick Preset Selector for Easy Testing */}
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setShowQuickSelect(!showQuickSelect)}
+              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center justify-between w-full cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-blue-500" /> Demo Account Credentials
+              </span>
+              <span>{showQuickSelect ? 'Hide ▲' : 'Show ▼'}</span>
+            </button>
+
+            {showQuickSelect && (
+              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] space-y-1.5">
+                <div
+                  onClick={() => fillAccount('admin', 'admin123')}
+                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
+                >
+                  <div>
+                    <span className="font-bold text-slate-900">admin</span>
+                    <span className="text-[10px] text-slate-500 ml-2">(Admin Role)</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">admin123</span>
+                </div>
+
+                <div
+                  onClick={() => fillAccount('eko', 'eko123')}
+                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
+                >
+                  <div>
+                    <span className="font-bold text-slate-900">eko</span>
+                    <span className="text-[10px] text-slate-500 ml-2">(QC Analyst / User Role)</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">eko123</span>
+                </div>
+
+                <div
+                  onClick={() => fillAccount('tech_sarah', 'sarah123')}
+                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
+                >
+                  <div>
+                    <span className="font-bold text-slate-900">tech_sarah</span>
+                    <span className="text-[10px] text-slate-500 ml-2">(Lab Specialist)</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">sarah123</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
