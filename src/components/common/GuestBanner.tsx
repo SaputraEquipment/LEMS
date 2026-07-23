@@ -3,7 +3,7 @@ import { ShieldAlert, LogIn } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const GuestBanner: React.FC = () => {
-  const { currentUser, switchRole } = useApp();
+  const { currentUser, logout } = useApp();
 
   if (currentUser?.role !== 'guest') return null;
 
@@ -21,11 +21,11 @@ export const GuestBanner: React.FC = () => {
         </div>
       </div>
       <button
-        onClick={() => switchRole('admin')}
-        className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-xl bg-sky-600 text-white hover:bg-sky-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+        onClick={logout}
+        className="shrink-0 text-xs font-semibold px-3.5 py-2 rounded-xl bg-sky-600 text-white hover:bg-sky-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
       >
         <LogIn className="w-3.5 h-3.5" />
-        Log In as Admin / Technician
+        Log In / Switch Account
       </button>
     </div>
   );

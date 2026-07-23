@@ -1,1 +1,6 @@
-{"name":"Laboratory Equipment Management System","description":"Enterprise-grade LEMS for quality control, equipment calibration, PM checklists, chemical safety, and spare parts management.","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
+{
+  "name": "Laboratory Equipment Management System",
+  "description": "Enterprise-grade LEMS for quality control, equipment calibration, PM checklists, chemical safety, and spare parts management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

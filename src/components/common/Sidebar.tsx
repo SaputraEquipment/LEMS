@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FlaskConical,
@@ -15,11 +15,10 @@ import {
   History,
   Settings,
   LogOut,
-  ChevronDown,
   UserCheck,
   Building2,
   Users,
-  Menu,
+  LogIn,
   X
 } from 'lucide-react';
 
@@ -51,8 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   onCloseMobile
 }) => {
-  const { currentUser, logout, switchRole, companyProfile } = useApp();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const { currentUser, logout, companyProfile } = useApp();
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -194,67 +192,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {navItem('settings', 'System Settings', <Settings className="w-4 h-4" />)}
                 </>
               ) : (
-                <div className="px-3 py-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                  🔒 Admin sections are restricted. Log in with Admin privileges to view User Management, Audit Log & Settings.
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed space-y-2">
+                  <p>🔒 Admin sections are restricted to Quality Managers.</p>
+                  <button
+                    onClick={logout}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 text-[10px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <LogIn className="w-3 h-3 text-blue-400" /> Log In as Admin
+                  </button>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Footer User Profile & Role Switcher */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/80 relative">
-          {/* Quick Role Switcher Menu */}
-          {showRoleMenu && (
-            <div className="absolute bottom-full left-4 right-4 mb-2 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 text-xs">
-              <div className="px-2 py-1.5 font-bold uppercase tracking-wider text-[10px] text-slate-400 border-b border-slate-800 mb-1">
-                Quick Role Switcher
-              </div>
-              <button
-                onClick={() => {
-                  switchRole('admin');
-                  setShowRoleMenu(false);
-                }}
-                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-slate-800 text-left cursor-pointer ${
-                  currentUser?.role === 'admin' ? 'bg-blue-600/20 text-blue-300 font-bold' : 'text-slate-300'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span>Admin (Full Access)</span>
-              </button>
-              <button
-                onClick={() => {
-                  switchRole('user');
-                  setShowRoleMenu(false);
-                }}
-                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-slate-800 text-left cursor-pointer ${
-                  currentUser?.role === 'user' ? 'bg-blue-600/20 text-blue-300 font-bold' : 'text-slate-300'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                <span>User (Technician / Operational)</span>
-              </button>
-              <button
-                onClick={() => {
-                  switchRole('guest');
-                  setShowRoleMenu(false);
-                }}
-                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-slate-800 text-left cursor-pointer ${
-                  currentUser?.role === 'guest' ? 'bg-blue-600/20 text-blue-300 font-bold' : 'text-slate-300'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-sky-400" />
-                <span>Guest (Read-Only)</span>
-              </button>
-            </div>
-          )}
-
+        {/* Footer User Profile & Log Out */}
+        <div className="p-4 border-t border-slate-800/80 bg-slate-950/80">
           <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
-              className="flex-1 flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800/80 transition-colors text-left cursor-pointer group"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md">
+            <div className="flex-1 flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800/60 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md shrink-0">
                 {currentUser?.fullName.charAt(0) || 'U'}
               </div>
               <div className="flex-1 min-w-0">
@@ -262,17 +218,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {currentUser?.fullName || 'Guest Observer'}
                 </div>
                 <div className="text-[10px] text-slate-400 flex items-center gap-1 capitalize">
-                  <UserCheck className="w-3 h-3 text-blue-400" />
-                  <span>{currentUser?.role || 'guest'}</span>
-                  <ChevronDown className="w-3 h-3 ml-auto text-slate-500 group-hover:text-white" />
+                  <UserCheck className="w-3 h-3 text-blue-400 shrink-0" />
+                  <span className="truncate">@{currentUser?.username || 'guest'}</span>
+                  <span className="ml-auto text-[9px] px-1 py-0.2 bg-slate-800 rounded text-slate-300 font-bold uppercase shrink-0">
+                    {currentUser?.role || 'guest'}
+                  </span>
                 </div>
               </div>
-            </button>
+            </div>
 
             <button
               onClick={logout}
-              title="Log Out"
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              title="Sign Out to Login Page"
+              className="p-2.5 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer shrink-0 border border-slate-800"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -282,3 +240,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+

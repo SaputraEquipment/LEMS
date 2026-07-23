@@ -3,11 +3,13 @@ export type UserRole = 'admin' | 'user' | 'guest';
 export interface User {
   id: string;
   username: string;
+  password?: string;
   fullName: string;
   email: string;
   role: UserRole;
   department?: string;
   active: boolean;
+  lastLogin?: string;
 }
 
 export type EquipmentStatus = 'active' | 'inactive' | 'under_maintenance' | 'decommissioned';
