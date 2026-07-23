@@ -132,7 +132,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadStored('currentUser', initialUsers[0]));
-  const [users, setUsers] = useState<User[]>(() => loadStored('users', initialUsers));
+  const [users, setUsers] = useState<User[]>(() => {
+    const stored = loadStored('users', initialUsers);
+    if (Array.isArray(stored) && stored.length > 0) {
+      const hasEko = stored.some(u => u.username === 'eko');
+      const list = hasEko ? stored : [...stored, initialUsers[3]];
+      return list.map(u => {
+        if (!u.password) {
+          const initMatch = initialUsers.find(i => i.username === u.username);
+          return { ...u, password: initMatch?.password || 'password123' };
+        }
+        return u;
+      });
+    }
+    return initialUsers;
+  });
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => {
     const loaded = loadStored('companyProfile', initialCompanyProfile);
     if (!loaded || !loaded.labName || loaded.labName.includes('Central Physical') || loaded.labName.includes('Quality Assurance Analytical')) {
@@ -208,22 +222,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Auth methods
-  const login = (username: string): boolean => {
-    const found = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.active);
-    if (found) {
-      setCurrentUser(found);
-      addToast('success', 'Welcome back!', `Logged in as ${found.fullName} (${found.role.toUpperCase()})`);
-      return true;
+  const login = (inputUsername: string, inputPassword?: string): boolean => {
+    const trimmedUser = inputUsername.trim().toLowerCase();
+    const found = users.find(u => u.username.toLowerCase() === trimmedUser);
+
+    if (!found) {
+      addToast('error', 'Authentication Failed', 'Username not registered in system.');
+      return false;
     }
-    // Fallback if entering "admin"
-    if (username.toLowerCase() === 'admin') {
-      const adminUser = users.find(u => u.role === 'admin') || initialUsers[0];
-      setCurrentUser(adminUser);
-      addToast('success', 'Welcome back!', `Logged in as Admin`);
-      return true;
+
+    if (!found.active) {
+      addToast('error', 'Account Suspended', `Account "${found.username}" is currently inactive. Contact QA Administrator.`);
+      return false;
     }
-    addToast('error', 'Authentication Failed', 'Invalid username or user account is inactive.');
-    return false;
+
+    // Verify Password if set
+    if (found.password && found.password.trim() !== '') {
+      if (!inputPassword || inputPassword !== found.password) {
+        addToast('error', 'Authentication Failed', 'Incorrect password. Please verify your credentials.');
+        return false;
+      }
+    }
+
+    // Update last login timestamp
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updatedUser = { ...found, lastLogin: nowStr };
+
+    setUsers(prev => prev.map(u => u.id === found.id ? updatedUser : u));
+    setCurrentUser(updatedUser);
+
+    addAuditEntry('Authentication', 'login', 'User', found.id, `User ${found.username} (${found.role}) signed in successfully`);
+    addToast('success', 'Authentication Successful', `Welcome back, ${found.fullName}`);
+    return true;
   };
 
   const loginAsGuest = () => {
