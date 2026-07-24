@@ -21,6 +21,7 @@ export const PMTaskSetupView: React.FC<PMTaskSetupViewProps> = ({ onOpenMobileMe
   } = useApp();
 
   const isGuest = currentUser?.role === 'guest';
+  const isAdmin = currentUser?.role === 'admin';
   const [selectedEqId, setSelectedEqId] = useState<string>(equipment[0]?.id || '');
 
   // Form State
@@ -156,7 +157,7 @@ export const PMTaskSetupView: React.FC<PMTaskSetupViewProps> = ({ onOpenMobileMe
         </div>
 
         {/* Right Column: Task Form */}
-        {!isGuest && (
+        {isAdmin ? (
           <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
@@ -239,6 +240,18 @@ export const PMTaskSetupView: React.FC<PMTaskSetupViewProps> = ({ onOpenMobileMe
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        ) : (
+          <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center justify-center text-center">
+            <div className="space-y-2 p-4">
+              <div className="p-3 bg-slate-100 text-slate-500 rounded-full inline-flex">
+                <Wrench className="w-6 h-6" />
+              </div>
+              <h4 className="text-xs font-bold text-slate-900 uppercase">View-Only PM Task Setup</h4>
+              <p className="text-[11px] text-slate-500 max-w-xs">
+                Admin credentials are required to configure or modify master preventive maintenance routines.
+              </p>
             </div>
           </div>
         )}

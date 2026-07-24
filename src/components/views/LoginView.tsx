@@ -1,22 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { FlaskConical, Shield, KeyRound, UserCheck, Eye, EyeOff, Info } from 'lucide-react';
+import { ToastContainer } from '../common/ToastContainer';
+import { FlaskConical, Shield, KeyRound, UserCheck, Eye, EyeOff } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const { login, loginAsGuest, companyProfile } = useApp();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showQuickSelect, setShowQuickSelect] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login(username, password);
-  };
-
-  const fillAccount = (user: string, pass: string) => {
-    setUsername(user);
-    setPassword(pass);
   };
 
   return (
@@ -25,24 +20,23 @@ export const LoginView: React.FC = () => {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-sm relative z-10">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex p-4 rounded-3xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 text-white shadow-2xl shadow-blue-500/30 mb-4 ring-8 ring-slate-900/60">
-            <FlaskConical className="w-10 h-10 stroke-[2]" />
+        <div className="text-center mb-6">
+          <div className="inline-flex p-3.5 rounded-2xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 text-white shadow-2xl shadow-blue-500/30 mb-3 ring-4 ring-slate-900/60">
+            <FlaskConical className="w-8 h-8 stroke-[2]" />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-wider">LEMS</h1>
-          <p className="text-sm font-semibold text-blue-300 mt-1">
+          <h1 className="text-2xl font-black text-white tracking-wider">LEMS</h1>
+          <p className="text-xs font-semibold text-blue-300 mt-1">
             Laboratory Equipment Management System
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">{companyProfile.labName}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{companyProfile.labName}</p>
         </div>
 
         {/* Card Shell */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/80 p-8 shadow-2xl text-slate-800">
-          <div className="border-b border-slate-100 pb-4 mb-6">
+        <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 p-6 shadow-2xl text-slate-800">
+          <div className="border-b border-slate-100 pb-3 mb-5 text-center">
             <h2 className="text-base font-bold text-slate-900">Sign In to LEMS</h2>
-            <p className="text-xs text-slate-500">Laboratory Equipment and Management System of Quality Department</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,7 +51,7 @@ export const LoginView: React.FC = () => {
                   required
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                  placeholder="Enter username"
+                  placeholder="Enter your username"
                   className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                 />
               </div>
@@ -74,7 +68,7 @@ export const LoginView: React.FC = () => {
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter password"
+                  placeholder="Enter your password"
                   className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-10 py-2.5 text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                 />
                 <button
@@ -89,65 +83,14 @@ export const LoginView: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white font-bold text-xs shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 hover:from-blue-800 hover:to-indigo-800 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white font-bold text-xs shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 hover:from-blue-800 hover:to-indigo-800 transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
             >
               <Shield className="w-4 h-4" />
               Log In to Dashboard
             </button>
           </form>
 
-          {/* Quick Preset Selector for Easy Testing */}
-          <div className="mt-4 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowQuickSelect(!showQuickSelect)}
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center justify-between w-full cursor-pointer"
-            >
-              <span className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-blue-500" /> Demo Account Credentials
-              </span>
-              <span>{showQuickSelect ? 'Hide ▲' : 'Show ▼'}</span>
-            </button>
-
-            {showQuickSelect && (
-              <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] space-y-1.5">
-                <div
-                  onClick={() => fillAccount('admin', 'admin123')}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
-                >
-                  <div>
-                    <span className="font-bold text-slate-900">admin</span>
-                    <span className="text-[10px] text-slate-500 ml-2">(Admin Role)</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">admin123</span>
-                </div>
-
-                <div
-                  onClick={() => fillAccount('eko', 'eko123')}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
-                >
-                  <div>
-                    <span className="font-bold text-slate-900">eko</span>
-                    <span className="text-[10px] text-slate-500 ml-2">(QC Analyst / User Role)</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">eko123</span>
-                </div>
-
-                <div
-                  onClick={() => fillAccount('tech_sarah', 'sarah123')}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors"
-                >
-                  <div>
-                    <span className="font-bold text-slate-900">tech_sarah</span>
-                    <span className="text-[10px] text-slate-500 ml-2">(Lab Specialist)</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-700">sarah123</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="relative my-5">
+          <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
             </div>
@@ -167,10 +110,13 @@ export const LoginView: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[11px] text-slate-400 mt-6">
+        <p className="text-center text-[11px] text-slate-400 mt-5">
           PT WARLBOR INTERNATIONAL INDONESIA
         </p>
       </div>
+
+      <ToastContainer />
     </div>
   );
 };
+

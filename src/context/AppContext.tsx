@@ -120,6 +120,17 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'LEMS_APP_STATE_V1';
 
+// Helper to execute SQL statement on backend SQLite database
+const syncSql = (sql: string, params: any[] = []) => {
+  fetch('/api/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql, params })
+  }).catch(err => {
+    console.error('[SQLite Sync Error]:', err);
+  });
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load initial state from LocalStorage or defaults
   const loadStored = <T,>(key: string, defaultVal: T): T => {
@@ -131,29 +142,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadStored('currentUser', initialUsers[0]));
-  const [users, setUsers] = useState<User[]>(() => {
-    const stored = loadStored('users', initialUsers);
-    if (Array.isArray(stored) && stored.length > 0) {
-      const hasEko = stored.some(u => u.username === 'eko');
-      const list = hasEko ? stored : [...stored, initialUsers[3]];
-      return list.map(u => {
-        if (!u.password) {
-          const initMatch = initialUsers.find(i => i.username === u.username);
-          return { ...u, password: initMatch?.password || 'password123' };
-        }
-        return u;
-      });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Clear session on mount to guarantee login screen on fresh open
+  useEffect(() => {
+    try {
+      localStorage.removeItem(`${STORAGE_KEY}_currentUser`);
+    } catch {
+      // ignore
     }
-    return initialUsers;
-  });
-  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => {
-    const loaded = loadStored('companyProfile', initialCompanyProfile);
-    if (!loaded || !loaded.labName || loaded.labName.includes('Central Physical') || loaded.labName.includes('Quality Assurance Analytical')) {
-      return { ...initialCompanyProfile, labName: 'Quality Department' };
-    }
-    return loaded;
-  });
+  }, []);
+
+  const [users, setUsers] = useState<User[]>(() => loadStored('users', initialUsers));
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => loadStored('companyProfile', initialCompanyProfile));
   const [systemSettings, setSystemSettings] = useState<SystemSetting[]>(() => loadStored('systemSettings', initialSystemSettings));
   const [categories, setCategories] = useState<EquipmentCategory[]>(() => loadStored('categories', initialCategories));
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>(() => loadStored('manufacturers', initialManufacturers));
@@ -169,8 +170,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => loadStored('auditLogs', initialAuditLogs));
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // LocalStorage persist effects
-  useEffect(() => { localStorage.setItem(`${STORAGE_KEY}_currentUser`, JSON.stringify(currentUser)); }, [currentUser]);
+  // Fetch SQLite database data on mount
+  useEffect(() => {
+    fetch('/api/data')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.users) {
+          if (Array.isArray(data.users)) setUsers(data.users);
+          if (data.companyProfile) setCompanyProfile(data.companyProfile);
+          if (Array.isArray(data.systemSettings)) setSystemSettings(data.systemSettings);
+          if (Array.isArray(data.categories)) setCategories(data.categories);
+          if (Array.isArray(data.manufacturers)) setManufacturers(data.manufacturers);
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (Array.isArray(data.equipment)) setEquipment(data.equipment);
+          if (Array.isArray(data.calibrationRecords)) setCalibrationRecords(data.calibrationRecords);
+          if (Array.isArray(data.pmTasks)) setPmTasks(data.pmTasks);
+          if (Array.isArray(data.pmTaskLogs)) setPmTaskLogs(data.pmTaskLogs);
+          if (Array.isArray(data.chemicals)) setChemicals(data.chemicals);
+          if (Array.isArray(data.chemicalTransactions)) setChemicalTransactions(data.chemicalTransactions);
+          if (Array.isArray(data.spareParts)) setSpareParts(data.spareParts);
+          if (Array.isArray(data.sparePartTransactions)) setSparePartTransactions(data.sparePartTransactions);
+          if (Array.isArray(data.auditLogs)) setAuditLogs(data.auditLogs);
+        }
+      })
+      .catch(err => {
+        console.warn('Falling back to local storage cache:', err);
+      });
+  }, []);
+
+  // Sync to LocalStorage as secondary cache
   useEffect(() => { localStorage.setItem(`${STORAGE_KEY}_users`, JSON.stringify(users)); }, [users]);
   useEffect(() => { localStorage.setItem(`${STORAGE_KEY}_companyProfile`, JSON.stringify(companyProfile)); }, [companyProfile]);
   useEffect(() => { localStorage.setItem(`${STORAGE_KEY}_systemSettings`, JSON.stringify(systemSettings)); }, [systemSettings]);
@@ -207,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
     const newLog: AuditLog = {
-      id: `audit-${Date.now()}`,
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       userId: currentUser.id,
       username: currentUser.username,
       userRole: currentUser.role,
@@ -219,6 +247,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: formattedDate
     };
     setAuditLogs(prev => [newLog, ...prev]);
+
+    // SQLite Sync
+    syncSql(
+      `INSERT INTO audit_logs (id, userId, username, userRole, module, action, entityType, entityId, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newLog.id, newLog.userId || '', newLog.username, newLog.userRole, newLog.module, newLog.action, newLog.entityType, newLog.entityId || '', newLog.details, newLog.timestamp]
+    );
   };
 
   // Auth methods
@@ -300,7 +334,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     txs.forEach(t => {
       if (t.type === 'stock_in') stock += t.quantity;
       else if (t.type === 'stock_out') stock -= t.quantity;
-      else if (t.type === 'adjustment') stock += t.quantity; // adjustment can be positive or negative
+      else if (t.type === 'adjustment') stock += t.quantity;
     });
     return Math.max(0, stock);
   };
@@ -330,18 +364,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastCalibrationDate: latest.calibrationDate,
         nextCalibrationDate: latest.nextDueDate
       } : e));
+
+      syncSql(
+        `UPDATE equipment SET lastCalibrationDate=?, nextCalibrationDate=? WHERE id=?`,
+        [latest.calibrationDate, latest.nextDueDate, eqId]
+      );
     }
   };
 
   // Company Profile & Settings
   const updateCompanyProfile = (profile: CompanyProfile) => {
     setCompanyProfile(profile);
+    syncSql(
+      `UPDATE company_profile SET companyName=?, labName=?, labCode=?, address=?, phone=?, email=?, isoStandard=? WHERE id=1`,
+      [profile.companyName, profile.labName, profile.labCode, profile.address, profile.phone, profile.email, profile.isoStandard]
+    );
     addAuditEntry('Company Settings', 'update', 'CompanyProfile', 'PROFILE-01', `Updated company laboratory profile: ${profile.companyName}`);
-    addToast('success', 'Profile Saved', 'Company profile has been updated.');
+    addToast('success', 'Profile Saved', 'Company profile updated in SQLite database.');
   };
 
   const updateSystemSetting = (id: string, value: string) => {
     setSystemSettings(prev => prev.map(s => s.id === id ? { ...s, value } : s));
+    syncSql(`UPDATE system_settings SET value=? WHERE id=?`, [value, id]);
     addAuditEntry('System Settings', 'update', 'SystemSetting', id, `Updated setting value to: ${value}`);
     addToast('success', 'Setting Saved', 'System configuration updated successfully.');
   };
@@ -350,12 +394,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addUser = (newUser: Omit<User, 'id'>) => {
     const user: User = { ...newUser, id: `usr-${Date.now()}` };
     setUsers(prev => [...prev, user]);
+    syncSql(
+      `INSERT INTO users (id, username, password, fullName, email, role, department, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [user.id, user.username, user.password || 'password123', user.fullName, user.email, user.role, user.department || '', user.active ? 1 : 0]
+    );
     addAuditEntry('User Management', 'create', 'User', user.id, `Created new user account: ${user.username} (${user.role})`);
-    addToast('success', 'User Created', `Account for ${user.username} has been added.`);
+    addToast('success', 'User Created', `Account for ${user.username} saved to database.`);
   };
 
   const updateUser = (updatedUser: User) => {
     setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    syncSql(
+      `UPDATE users SET username=?, password=?, fullName=?, email=?, role=?, department=?, active=? WHERE id=?`,
+      [updatedUser.username, updatedUser.password || 'password123', updatedUser.fullName, updatedUser.email, updatedUser.role, updatedUser.department || '', updatedUser.active ? 1 : 0, updatedUser.id]
+    );
     addAuditEntry('User Management', 'update', 'User', updatedUser.id, `Updated user details for: ${updatedUser.username}`);
     addToast('success', 'User Updated', `Account ${updatedUser.username} saved.`);
   };
@@ -367,6 +419,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = users.find(u => u.id === id);
     setUsers(prev => prev.filter(u => u.id !== id));
+    syncSql(`DELETE FROM users WHERE id=?`, [id]);
     if (target) {
       addAuditEntry('User Management', 'delete', 'User', id, `Deleted user account: ${target.username}`);
       addToast('success', 'User Deleted', `Account ${target.username} has been removed.`);
@@ -377,12 +430,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addCategory = (cat: Omit<EquipmentCategory, 'id'>) => {
     const newCat = { ...cat, id: `cat-${Date.now()}` };
     setCategories(prev => [...prev, newCat]);
+    syncSql(`INSERT INTO categories (id, name, description) VALUES (?, ?, ?)`, [newCat.id, newCat.name, newCat.description || '']);
     addAuditEntry('Master Data', 'create', 'EquipmentCategory', newCat.id, `Created category: ${newCat.name}`);
     addToast('success', 'Category Created', newCat.name);
   };
 
   const updateCategory = (cat: EquipmentCategory) => {
     setCategories(prev => prev.map(c => c.id === cat.id ? cat : c));
+    syncSql(`UPDATE categories SET name=?, description=? WHERE id=?`, [cat.name, cat.description || '', cat.id]);
     addAuditEntry('Master Data', 'update', 'EquipmentCategory', cat.id, `Updated category: ${cat.name}`);
     addToast('success', 'Category Updated', cat.name);
   };
@@ -390,6 +445,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteCategory = (id: string) => {
     const cat = categories.find(c => c.id === id);
     setCategories(prev => prev.filter(c => c.id !== id));
+    syncSql(`DELETE FROM categories WHERE id=?`, [id]);
     addAuditEntry('Master Data', 'delete', 'EquipmentCategory', id, `Deleted category: ${cat?.name || id}`);
     addToast('success', 'Category Deleted');
   };
@@ -397,12 +453,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addManufacturer = (mfr: Omit<Manufacturer, 'id'>) => {
     const newMfr = { ...mfr, id: `mfr-${Date.now()}` };
     setManufacturers(prev => [...prev, newMfr]);
+    syncSql(
+      `INSERT INTO manufacturers (id, name, contactPerson, email, phone, address, website) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [newMfr.id, newMfr.name, newMfr.contactPerson || '', newMfr.email || '', newMfr.phone || '', newMfr.address || '', newMfr.website || '']
+    );
     addAuditEntry('Master Data', 'create', 'Manufacturer', newMfr.id, `Added manufacturer: ${newMfr.name}`);
     addToast('success', 'Manufacturer Added', newMfr.name);
   };
 
   const updateManufacturer = (mfr: Manufacturer) => {
     setManufacturers(prev => prev.map(m => m.id === mfr.id ? mfr : m));
+    syncSql(
+      `UPDATE manufacturers SET name=?, contactPerson=?, email=?, phone=?, address=?, website=? WHERE id=?`,
+      [mfr.name, mfr.contactPerson || '', mfr.email || '', mfr.phone || '', mfr.address || '', mfr.website || '', mfr.id]
+    );
     addAuditEntry('Master Data', 'update', 'Manufacturer', mfr.id, `Updated manufacturer: ${mfr.name}`);
     addToast('success', 'Manufacturer Updated', mfr.name);
   };
@@ -410,6 +474,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteManufacturer = (id: string) => {
     const mfr = manufacturers.find(m => m.id === id);
     setManufacturers(prev => prev.filter(m => m.id !== id));
+    syncSql(`DELETE FROM manufacturers WHERE id=?`, [id]);
     addAuditEntry('Master Data', 'delete', 'Manufacturer', id, `Deleted manufacturer: ${mfr?.name || id}`);
     addToast('success', 'Manufacturer Removed');
   };
@@ -417,12 +482,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addLocation = (loc: Omit<Location, 'id'>) => {
     const newLoc = { ...loc, id: `loc-${Date.now()}` };
     setLocations(prev => [...prev, newLoc]);
+    syncSql(
+      `INSERT INTO locations (id, name, building, room, description) VALUES (?, ?, ?, ?, ?)`,
+      [newLoc.id, newLoc.name, newLoc.building || '', newLoc.room || '', newLoc.description || '']
+    );
     addAuditEntry('Master Data', 'create', 'Location', newLoc.id, `Added location: ${newLoc.name}`);
     addToast('success', 'Location Created', newLoc.name);
   };
 
   const updateLocation = (loc: Location) => {
     setLocations(prev => prev.map(l => l.id === loc.id ? loc : l));
+    syncSql(
+      `UPDATE locations SET name=?, building=?, room=?, description=? WHERE id=?`,
+      [loc.name, loc.building || '', loc.room || '', loc.description || '', loc.id]
+    );
     addAuditEntry('Master Data', 'update', 'Location', loc.id, `Updated location: ${loc.name}`);
     addToast('success', 'Location Updated', loc.name);
   };
@@ -430,6 +503,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteLocation = (id: string) => {
     const loc = locations.find(l => l.id === id);
     setLocations(prev => prev.filter(l => l.id !== id));
+    syncSql(`DELETE FROM locations WHERE id=?`, [id]);
     addAuditEntry('Master Data', 'delete', 'Location', id, `Deleted location: ${loc?.name || id}`);
     addToast('success', 'Location Removed');
   };
@@ -442,20 +516,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
     setEquipment(prev => [...prev, eq]);
+    syncSql(
+      `INSERT INTO equipment (id, sapCode, name, categoryId, manufacturerId, model, serialNumber, tagNumber, locationId, department, status, purchaseDate, commissionDate, calibrationFrequencyDays, pmFrequencyDays, measurementSpecs, notes, photoUrl, lastCalibrationDate, nextCalibrationDate, lastPmDate, nextPmDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        eq.id, eq.sapCode || '', eq.name, eq.categoryId, eq.manufacturerId, eq.model || '',
+        eq.serialNumber || '', eq.tagNumber || '', eq.locationId, eq.department || '', eq.status,
+        eq.purchaseDate || '', eq.commissionDate || '', eq.calibrationFrequencyDays || 0, eq.pmFrequencyDays || 0,
+        eq.measurementSpecs || '', eq.notes || '', eq.photoUrl || '', eq.lastCalibrationDate || '',
+        eq.nextCalibrationDate || '', eq.lastPmDate || '', eq.nextPmDate || ''
+      ]
+    );
     addAuditEntry('Equipment', 'create', 'Equipment', eq.id, `Registered new equipment: ${eq.name} (${eq.id})`);
-    addToast('success', 'Equipment Added', `${eq.name} registered successfully.`);
+    addToast('success', 'Equipment Added', `${eq.name} registered to SQLite database.`);
     return true;
   };
 
   const updateEquipment = (eq: Equipment) => {
     setEquipment(prev => prev.map(e => e.id === eq.id ? eq : e));
+    syncSql(
+      `UPDATE equipment SET sapCode=?, name=?, categoryId=?, manufacturerId=?, model=?, serialNumber=?, tagNumber=?, locationId=?, department=?, status=?, purchaseDate=?, commissionDate=?, calibrationFrequencyDays=?, pmFrequencyDays=?, measurementSpecs=?, notes=?, photoUrl=?, lastCalibrationDate=?, nextCalibrationDate=?, lastPmDate=?, nextPmDate=? WHERE id=?`,
+      [
+        eq.sapCode || '', eq.name, eq.categoryId, eq.manufacturerId, eq.model || '',
+        eq.serialNumber || '', eq.tagNumber || '', eq.locationId, eq.department || '', eq.status,
+        eq.purchaseDate || '', eq.commissionDate || '', eq.calibrationFrequencyDays || 0, eq.pmFrequencyDays || 0,
+        eq.measurementSpecs || '', eq.notes || '', eq.photoUrl || '', eq.lastCalibrationDate || '',
+        eq.nextCalibrationDate || '', eq.lastPmDate || '', eq.nextPmDate || '', eq.id
+      ]
+    );
     addAuditEntry('Equipment', 'update', 'Equipment', eq.id, `Updated equipment specs/status for ${eq.name} (${eq.id})`);
-    addToast('success', 'Equipment Saved', `${eq.name} details updated.`);
+    addToast('success', 'Equipment Saved', `${eq.name} details updated in database.`);
   };
 
   const deleteEquipment = (id: string) => {
     const target = equipment.find(e => e.id === id);
     setEquipment(prev => prev.filter(e => e.id !== id));
+    syncSql(`DELETE FROM equipment WHERE id=?`, [id]);
     addAuditEntry('Equipment', 'delete', 'Equipment', id, `Decommissioned & deleted equipment asset: ${target?.name || id}`);
     addToast('success', 'Equipment Removed', `${target?.name || id} deleted.`);
   };
@@ -465,14 +560,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newCal: CalibrationRecord = { ...cal, id: `CAL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}` };
     const updatedRecords = [newCal, ...calibrationRecords];
     setCalibrationRecords(updatedRecords);
+    syncSql(
+      `INSERT INTO calibration_records (id, equipmentId, calibrationType, vendorName, technician, calibrationDate, nextDueDate, certificateNumber, result, certificateFileName, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newCal.id, newCal.equipmentId, newCal.calibrationType, newCal.vendorName || '', newCal.technician || '',
+        newCal.calibrationDate, newCal.nextDueDate, newCal.certificateNumber || '', newCal.result,
+        newCal.certificateFileName || '', newCal.notes || ''
+      ]
+    );
     recalculateEquipmentCalDates(newCal.equipmentId, updatedRecords);
     addAuditEntry('Calibration', 'create', 'CalibrationRecord', newCal.id, `Added calibration record ${newCal.certificateNumber} for ${newCal.equipmentId} with result: ${newCal.result.toUpperCase()}`);
-    addToast('success', 'Calibration Record Saved', `Certificate ${newCal.certificateNumber} logged.`);
+    addToast('success', 'Calibration Record Saved', `Certificate ${newCal.certificateNumber} logged in SQLite.`);
   };
 
   const updateCalibrationRecord = (cal: CalibrationRecord) => {
     const updatedRecords = calibrationRecords.map(c => c.id === cal.id ? cal : c);
     setCalibrationRecords(updatedRecords);
+    syncSql(
+      `UPDATE calibration_records SET equipmentId=?, calibrationType=?, vendorName=?, technician=?, calibrationDate=?, nextDueDate=?, certificateNumber=?, result=?, certificateFileName=?, notes=? WHERE id=?`,
+      [
+        cal.equipmentId, cal.calibrationType, cal.vendorName || '', cal.technician || '',
+        cal.calibrationDate, cal.nextDueDate, cal.certificateNumber || '', cal.result,
+        cal.certificateFileName || '', cal.notes || '', cal.id
+      ]
+    );
     recalculateEquipmentCalDates(cal.equipmentId, updatedRecords);
     addAuditEntry('Calibration', 'update', 'CalibrationRecord', cal.id, `Updated calibration details for ${cal.certificateNumber}`);
     addToast('success', 'Calibration Updated', `Record ${cal.certificateNumber} saved.`);
@@ -482,6 +593,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = calibrationRecords.find(c => c.id === id);
     const updatedRecords = calibrationRecords.filter(c => c.id !== id);
     setCalibrationRecords(updatedRecords);
+    syncSql(`DELETE FROM calibration_records WHERE id=?`, [id]);
     if (target) {
       recalculateEquipmentCalDates(target.equipmentId, updatedRecords);
       addAuditEntry('Calibration', 'delete', 'CalibrationRecord', id, `Deleted calibration certificate ${target.certificateNumber}`);
@@ -493,12 +605,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPMTask = (task: Omit<PMTask, 'id'>) => {
     const newTask: PMTask = { ...task, id: `task-${Date.now()}` };
     setPmTasks(prev => [...prev, newTask]);
+    syncSql(
+      `INSERT INTO pm_tasks (id, equipmentId, taskName, frequency, active) VALUES (?, ?, ?, ?, ?)`,
+      [newTask.id, newTask.equipmentId, newTask.taskName, newTask.frequency, newTask.active ? 1 : 0]
+    );
     addAuditEntry('PM Setup', 'create', 'PMTask', newTask.id, `Added PM Task "${newTask.taskName}" for ${newTask.equipmentId}`);
     addToast('success', 'PM Task Added', newTask.taskName);
   };
 
   const updatePMTask = (task: PMTask) => {
     setPmTasks(prev => prev.map(t => t.id === task.id ? task : t));
+    syncSql(
+      `UPDATE pm_tasks SET equipmentId=?, taskName=?, frequency=?, active=? WHERE id=?`,
+      [task.equipmentId, task.taskName, task.frequency, task.active ? 1 : 0, task.id]
+    );
     addAuditEntry('PM Setup', 'update', 'PMTask', task.id, `Updated PM Task "${task.taskName}"`);
     addToast('success', 'PM Task Updated', task.taskName);
   };
@@ -506,6 +626,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deletePMTask = (id: string) => {
     const task = pmTasks.find(t => t.id === id);
     setPmTasks(prev => prev.filter(t => t.id !== id));
+    syncSql(`DELETE FROM pm_tasks WHERE id=?`, [id]);
     addAuditEntry('PM Setup', 'delete', 'PMTask', id, `Deleted PM task: ${task?.taskName || id}`);
     addToast('success', 'PM Task Removed');
   };
@@ -513,26 +634,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const togglePMTaskLog = (taskId: string, equipmentId: string, date: string, periodKey: string, status: 'done' | 'not_done' | 'na', notes?: string) => {
     const existingIndex = pmTaskLogs.findIndex(l => l.taskId === taskId && l.periodKey === periodKey);
     let newLogs = [...pmTaskLogs];
+    let logId = `log-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`;
+    let performedBy = currentUser?.username || 'user';
+
     if (existingIndex >= 0) {
+      logId = newLogs[existingIndex].id;
       newLogs[existingIndex] = {
         ...newLogs[existingIndex],
         status,
-        performedBy: currentUser?.username || 'user',
+        performedBy,
         notes: notes !== undefined ? notes : newLogs[existingIndex].notes
       };
     } else {
       newLogs.push({
-        id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        id: logId,
         taskId,
         equipmentId,
         date,
         periodKey,
         status,
-        performedBy: currentUser?.username || 'user',
+        performedBy,
         notes
       });
     }
     setPmTaskLogs(newLogs);
+
+    syncSql(
+      `INSERT INTO pm_task_logs (id, taskId, equipmentId, date, periodKey, status, performedBy, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET status=excluded.status, performedBy=excluded.performedBy, notes=excluded.notes`,
+      [logId, taskId, equipmentId, date, periodKey, status, performedBy, notes || '']
+    );
+
     addAuditEntry('PM Checklist', 'update', 'PMTaskLog', taskId, `Updated PM checklist status to ${status.toUpperCase()} for period ${periodKey}`);
   };
 
@@ -540,12 +673,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addChemical = (chem: Omit<ChemicalInventory, 'id'>) => {
     const newChem: ChemicalInventory = { ...chem, id: `CHEM-${chem.name.substring(0, 4).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}` };
     setChemicals(prev => [...prev, newChem]);
+    syncSql(
+      `INSERT INTO chemicals (id, name, casNumber, supplier, batchNumber, unit, initialStock, minimumStock, expiryDate, locationId, storageConditions, hazardClass, coaFileName, msdsFileName, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newChem.id, newChem.name, newChem.casNumber || '', newChem.supplier || '', newChem.batchNumber || '', newChem.unit,
+        newChem.initialStock, newChem.minimumStock, newChem.expiryDate || '', newChem.locationId, newChem.storageConditions || '',
+        newChem.hazardClass || '', newChem.coaFileName || '', newChem.msdsFileName || '', newChem.notes || ''
+      ]
+    );
     addAuditEntry('Chemical Inventory', 'create', 'ChemicalInventory', newChem.id, `Registered chemical standard: ${newChem.name} (CAS ${newChem.casNumber})`);
     addToast('success', 'Chemical Registered', newChem.name);
   };
 
   const updateChemical = (chem: ChemicalInventory) => {
     setChemicals(prev => prev.map(c => c.id === chem.id ? chem : c));
+    syncSql(
+      `UPDATE chemicals SET name=?, casNumber=?, supplier=?, batchNumber=?, unit=?, initialStock=?, minimumStock=?, expiryDate=?, locationId=?, storageConditions=?, hazardClass=?, coaFileName=?, msdsFileName=?, notes=? WHERE id=?`,
+      [
+        chem.name, chem.casNumber || '', chem.supplier || '', chem.batchNumber || '', chem.unit,
+        chem.initialStock, chem.minimumStock, chem.expiryDate || '', chem.locationId, chem.storageConditions || '',
+        chem.hazardClass || '', chem.coaFileName || '', chem.msdsFileName || '', chem.notes || '', chem.id
+      ]
+    );
     addAuditEntry('Chemical Inventory', 'update', 'ChemicalInventory', chem.id, `Updated details for chemical: ${chem.name}`);
     addToast('success', 'Chemical Saved', chem.name);
   };
@@ -553,6 +702,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteChemical = (id: string) => {
     const chem = chemicals.find(c => c.id === id);
     setChemicals(prev => prev.filter(c => c.id !== id));
+    syncSql(`DELETE FROM chemicals WHERE id=?`, [id]);
     addAuditEntry('Chemical Inventory', 'delete', 'ChemicalInventory', id, `Removed chemical entry: ${chem?.name || id}`);
     addToast('success', 'Chemical Removed');
   };
@@ -560,6 +710,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addChemicalTransaction = (tx: Omit<ChemicalTransaction, 'id'>) => {
     const newTx: ChemicalTransaction = { ...tx, id: `TX-CHEM-${Date.now()}` };
     setChemicalTransactions(prev => [newTx, ...prev]);
+    syncSql(
+      `INSERT INTO chemical_transactions (id, chemicalId, type, quantity, date, performedBy, reason, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newTx.id, newTx.chemicalId, newTx.type, newTx.quantity, newTx.date, newTx.performedBy || '', newTx.reason || '', newTx.notes || '']
+    );
     const chem = chemicals.find(c => c.id === tx.chemicalId);
     addAuditEntry('Chemical Transactions', 'create', 'ChemicalTransaction', newTx.id, `Logged ${tx.type.toUpperCase()} of ${tx.quantity} ${chem?.unit || ''} for ${chem?.name || tx.chemicalId}`);
     addToast('success', 'Transaction Recorded', `${tx.type.replace('_', ' ').toUpperCase()}: ${tx.quantity} ${chem?.unit || ''}`);
@@ -569,12 +723,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addSparePart = (sp: Omit<SparePartInventory, 'id'>) => {
     const newSp: SparePartInventory = { ...sp, id: `SP-${sp.partNumber.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}` };
     setSpareParts(prev => [...prev, newSp]);
+    syncSql(
+      `INSERT INTO spare_parts (id, partNumber, name, supplier, category, unit, initialStock, minimumStock, maximumStock, locationId, unitCost, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newSp.id, newSp.partNumber || '', newSp.name, newSp.supplier || '', newSp.category || '', newSp.unit,
+        newSp.initialStock, newSp.minimumStock, newSp.maximumStock, newSp.locationId, newSp.unitCost || 0, newSp.notes || ''
+      ]
+    );
     addAuditEntry('Spare Parts Inventory', 'create', 'SparePartInventory', newSp.id, `Added spare part: ${newSp.name} (P/N ${newSp.partNumber})`);
     addToast('success', 'Spare Part Registered', newSp.name);
   };
 
   const updateSparePart = (sp: SparePartInventory) => {
     setSpareParts(prev => prev.map(s => s.id === sp.id ? sp : s));
+    syncSql(
+      `UPDATE spare_parts SET partNumber=?, name=?, supplier=?, category=?, unit=?, initialStock=?, minimumStock=?, maximumStock=?, locationId=?, unitCost=?, notes=? WHERE id=?`,
+      [
+        sp.partNumber || '', sp.name, sp.supplier || '', sp.category || '', sp.unit,
+        sp.initialStock, sp.minimumStock, sp.maximumStock, sp.locationId, sp.unitCost || 0, sp.notes || '', sp.id
+      ]
+    );
     addAuditEntry('Spare Parts Inventory', 'update', 'SparePartInventory', sp.id, `Updated spare part: ${sp.name}`);
     addToast('success', 'Spare Part Saved', sp.name);
   };
@@ -582,6 +750,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteSparePart = (id: string) => {
     const sp = spareParts.find(s => s.id === id);
     setSpareParts(prev => prev.filter(s => s.id !== id));
+    syncSql(`DELETE FROM spare_parts WHERE id=?`, [id]);
     addAuditEntry('Spare Parts Inventory', 'delete', 'SparePartInventory', id, `Deleted spare part: ${sp?.name || id}`);
     addToast('success', 'Spare Part Removed');
   };
@@ -589,31 +758,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addSparePartTransaction = (tx: Omit<SparePartTransaction, 'id'>) => {
     const newTx: SparePartTransaction = { ...tx, id: `TX-SP-${Date.now()}` };
     setSparePartTransactions(prev => [newTx, ...prev]);
+    syncSql(
+      `INSERT INTO spare_part_transactions (id, sparePartId, type, quantity, date, performedBy, linkedEquipmentId, reason, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [newTx.id, newTx.sparePartId, newTx.type, newTx.quantity, newTx.date, newTx.performedBy || '', newTx.linkedEquipmentId || '', newTx.reason || '', newTx.notes || '']
+    );
     const sp = spareParts.find(s => s.id === tx.sparePartId);
     addAuditEntry('Spare Parts Transactions', 'create', 'SparePartTransaction', newTx.id, `Logged ${tx.type.toUpperCase()} of ${tx.quantity} units for ${sp?.name || tx.sparePartId}`);
     addToast('success', 'Transaction Recorded', `${tx.type.replace('_', ' ').toUpperCase()}: ${tx.quantity} ${sp?.unit || ''}`);
   };
 
-  // Reset Factory Data
+  // Reset Factory Data in SQLite
   const resetToInitialData = () => {
-    setCurrentUser(initialUsers[0]);
-    setUsers(initialUsers);
-    setCompanyProfile(initialCompanyProfile);
-    setSystemSettings(initialSystemSettings);
-    setCategories(initialCategories);
-    setManufacturers(initialManufacturers);
-    setLocations(initialLocations);
-    setEquipment(initialEquipment);
-    setCalibrationRecords(initialCalibrationRecords);
-    setPmTasks(initialPMTasks);
-    setPmTaskLogs(initialPMTaskLogs);
-    setChemicals(initialChemicals);
-    setChemicalTransactions(initialChemicalTransactions);
-    setSpareParts(initialSpareParts);
-    setSparePartTransactions(initialSparePartTransactions);
-    setAuditLogs(initialAuditLogs);
-    localStorage.clear();
-    addToast('info', 'System Reset', 'All data has been reset to default factory seed state.');
+    fetch('/api/reset-db', { method: 'POST' })
+      .then(res => res.json())
+      .then(resData => {
+        if (resData?.data) {
+          const d = resData.data;
+          setUsers(d.users);
+          setCompanyProfile(d.companyProfile);
+          setSystemSettings(d.systemSettings);
+          setCategories(d.categories);
+          setManufacturers(d.manufacturers);
+          setLocations(d.locations);
+          setEquipment(d.equipment);
+          setCalibrationRecords(d.calibrationRecords);
+          setPmTasks(d.pmTasks);
+          setPmTaskLogs(d.pmTaskLogs);
+          setChemicals(d.chemicals);
+          setChemicalTransactions(d.chemicalTransactions);
+          setSpareParts(d.spareParts);
+          setSparePartTransactions(d.sparePartTransactions);
+          setAuditLogs(d.auditLogs);
+        }
+        localStorage.clear();
+        addToast('info', 'SQLite Database Reset', 'SQLite database re-seeded and reset to clean factory state.');
+      })
+      .catch(err => {
+        console.error('Reset error:', err);
+        addToast('error', 'Reset Failed', 'Could not reset SQLite database.');
+      });
   };
 
   return (

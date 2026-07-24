@@ -21,12 +21,13 @@ export const ChemicalTransactionsView: React.FC<ChemicalTransactionsViewProps> =
   } = useApp();
 
   const isGuest = currentUser?.role === 'guest';
+  const isAdmin = currentUser?.role === 'admin';
   const [filterChemId, setFilterChemId] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form Fields
   const [chemicalId, setChemicalId] = useState(chemicals[0]?.id || '');
-  const [type, setType] = useState<TransactionType>('stock_in');
+  const [type, setType] = useState<TransactionType>(isAdmin ? 'stock_in' : 'stock_out');
   const [quantity, setQuantity] = useState<number>(5);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [performedBy, setPerformedBy] = useState(currentUser?.fullName || 'Sarah Jenkins');
@@ -35,11 +36,11 @@ export const ChemicalTransactionsView: React.FC<ChemicalTransactionsViewProps> =
 
   const openAddModal = () => {
     setChemicalId(chemicals[0]?.id || '');
-    setType('stock_in');
+    setType(isAdmin ? 'stock_in' : 'stock_out');
     setQuantity(5);
     setDate(new Date().toISOString().split('T')[0]);
     setPerformedBy(currentUser?.fullName || 'Sarah Jenkins');
-    setReason('Routine stock replenishment receipt');
+    setReason('Routine analytical lab usage');
     setNotes('');
     setIsModalOpen(true);
   };
@@ -48,12 +49,15 @@ export const ChemicalTransactionsView: React.FC<ChemicalTransactionsViewProps> =
     e.preventDefault();
     if (isGuest) return;
 
+    // Non-admin users are strictly restricted to stock_out (Pemakaian / Item Taking)
+    const effectiveType = isAdmin ? type : 'stock_out';
+
     addChemicalTransaction({
       chemicalId,
-      type,
+      type: effectiveType,
       quantity: Number(quantity),
       date,
-      performedBy,
+      performedBy: currentUser?.fullName || performedBy,
       reason,
       notes
     });
@@ -198,16 +202,23 @@ export const ChemicalTransactionsView: React.FC<ChemicalTransactionsViewProps> =
               <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                 Transaction Type *
               </label>
-              <select
-                required
-                value={type}
-                onChange={e => setType(e.target.value as TransactionType)}
-                className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900"
-              >
-                <option value="stock_in">Stock In (Receipt / PO)</option>
-                <option value="stock_out">Stock Out (Lab Usage / Prep)</option>
-                <option value="adjustment">Stock Adjustment (Audit Correction)</option>
-              </select>
+              {isAdmin ? (
+                <select
+                  required
+                  value={type}
+                  onChange={e => setType(e.target.value as TransactionType)}
+                  className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900"
+                >
+                  <option value="stock_in">Stock In (Receipt / Store replenishment)</option>
+                  <option value="stock_out">Stock Out (Lab Usage / Pemakaian Barang)</option>
+                  <option value="adjustment">Stock Adjustment (Audit Correction)</option>
+                </select>
+              ) : (
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-bold flex items-center justify-between">
+                  <span>Stock Out (Usage / Pemakaian Barang)</span>
+                  <span className="text-[10px] bg-blue-200 px-2 py-0.5 rounded text-blue-800 uppercase font-mono">User Restricted</span>
+                </div>
+              )}
             </div>
 
             <div>

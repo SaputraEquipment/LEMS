@@ -22,6 +22,7 @@ export const SparePartsTransactionsView: React.FC<SparePartsTransactionsViewProp
   } = useApp();
 
   const isGuest = currentUser?.role === 'guest';
+  const isAdmin = currentUser?.role === 'admin';
   const [filterPartId, setFilterPartId] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -37,7 +38,7 @@ export const SparePartsTransactionsView: React.FC<SparePartsTransactionsViewProp
 
   const openAddModal = () => {
     setSparePartId(spareParts[0]?.id || '');
-    setType('stock_out');
+    setType(isAdmin ? 'stock_out' : 'stock_out');
     setQuantity(1);
     setDate(new Date().toISOString().split('T')[0]);
     setPerformedBy(currentUser?.fullName || 'Sarah Jenkins');
@@ -51,13 +52,15 @@ export const SparePartsTransactionsView: React.FC<SparePartsTransactionsViewProp
     e.preventDefault();
     if (isGuest) return;
 
+    const effectiveType = isAdmin ? type : 'stock_out';
+
     addSparePartTransaction({
       sparePartId,
-      type,
+      type: effectiveType,
       quantity: Number(quantity),
       date,
-      performedBy,
-      linkedEquipmentId: type === 'stock_out' ? linkedEquipmentId : undefined,
+      performedBy: currentUser?.fullName || performedBy,
+      linkedEquipmentId: effectiveType === 'stock_out' ? linkedEquipmentId : undefined,
       reason,
       notes
     });
@@ -210,16 +213,23 @@ export const SparePartsTransactionsView: React.FC<SparePartsTransactionsViewProp
               <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                 Transaction Type *
               </label>
-              <select
-                required
-                value={type}
-                onChange={e => setType(e.target.value as TransactionType)}
-                className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900"
-              >
-                <option value="stock_out">Stock Out (Issued for Maintenance)</option>
-                <option value="stock_in">Stock In (Purchased Restock)</option>
-                <option value="adjustment">Stock Adjustment (Audit)</option>
-              </select>
+              {isAdmin ? (
+                <select
+                  required
+                  value={type}
+                  onChange={e => setType(e.target.value as TransactionType)}
+                  className="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900"
+                >
+                  <option value="stock_out">Stock Out (Issued for Maintenance / Usage)</option>
+                  <option value="stock_in">Stock In (Purchased Restock / Receipt)</option>
+                  <option value="adjustment">Stock Adjustment (Audit Correction)</option>
+                </select>
+              ) : (
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 font-bold flex items-center justify-between">
+                  <span>Stock Out (Usage / Pengambilan Sparepart)</span>
+                  <span className="text-[10px] bg-blue-200 px-2 py-0.5 rounded text-blue-800 uppercase font-mono">User Restricted</span>
+                </div>
+              )}
             </div>
 
             <div>

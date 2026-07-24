@@ -23,6 +23,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onOpenMobileMe
   } = useApp();
 
   const isGuest = currentUser?.role === 'guest';
+  const isAdmin = currentUser?.role === 'admin';
   const [filterEquipmentId, setFilterEquipmentId] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCal, setEditingCal] = useState<CalibrationRecord | null>(null);
@@ -226,7 +227,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onOpenMobileMe
         subtitle="Traceable internal & external calibration records, vendor tracking, and due date management"
         icon={Ruler}
         actions={
-          !isGuest ? (
+          isAdmin ? (
             <button
               onClick={openAddModal}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center gap-1.5 cursor-pointer"
@@ -471,7 +472,7 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onOpenMobileMe
             />
           </div>
 
-          {!isGuest && (
+          {isAdmin ? (
             <div className="flex items-center justify-between pt-4 border-t border-slate-200">
               {editingCal ? (
                 <button
@@ -501,6 +502,17 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({ onOpenMobileMe
                   <Save className="w-3.5 h-3.5" /> Save Calibration Record
                 </button>
               </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <span className="text-xs text-slate-500 italic">View-only mode (Admin role required to log or modify calibration records)</span>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 text-white font-bold text-xs shadow-xs cursor-pointer"
+              >
+                Close Details
+              </button>
             </div>
           )}
         </form>

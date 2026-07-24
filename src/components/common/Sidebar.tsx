@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FlaskConical,
+  Microscope,
   LayoutDashboard,
   Database,
   Wrench,
@@ -117,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-tr from-blue-600 via-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20">
-                <FlaskConical className="w-6 h-6 stroke-[2]" />
+                <Microscope className="w-6 h-6 stroke-[2]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">

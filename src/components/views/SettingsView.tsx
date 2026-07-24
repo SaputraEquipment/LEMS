@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Header } from '../common/Header';
+import { SqliteInspector } from '../common/SqliteInspector';
 import { Settings as SettingsIcon, Save, Download, Upload, RotateCcw, Building2, ShieldCheck, Database, AlertTriangle } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -138,8 +139,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenMobileMenu }) 
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Database Backup, Restore & Reset</h3>
-              <p className="text-xs text-slate-500">Full JSON serialization of LEMS application state</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">Database Backup, Restore & Reset</h3>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-[10px] flex items-center gap-1 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> SQLite Active (database.sqlite)
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">Persistent disk storage backed by SQLite engine</p>
             </div>
           </div>
 
@@ -208,6 +214,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onOpenMobileMenu }) 
           </div>
         </div>
       </div>
+
+      {/* SQLite Database Mockup & Inspector */}
+      <SqliteInspector />
     </div>
   );
 };

@@ -164,7 +164,7 @@ export interface SparePartTransaction {
   notes: string;
 }
 
-export type AuditAction = 'create' | 'update' | 'delete';
+export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'logout';
 
 export interface AuditLog {
   id: string;
